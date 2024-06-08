@@ -1,0 +1,5 @@
+requests
+pandas
+xgboost
+scikit-learn
+python-telegram-bot
