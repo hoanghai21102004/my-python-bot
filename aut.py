@@ -7,10 +7,11 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
 
+
 def fetch_historical_results(limit=100):
     url = "https://m.coinvid.com/api/rocket-api/game/issue-result/page"
     params = {"subServiceCode": "RG1M", "size": limit}
-    
+
     headers = {
         "Host": "m.coinvid.com",
         "Connection": "keep-alive",
@@ -31,7 +32,7 @@ def fetch_historical_results(limit=100):
         "Accept-Encoding": "gzip, deflate, br, zstd",
         "Cookie": "_fbp=fb.1.1717773039503.427590769630604432; JSESSIONID=J_gUYvXcOABIiKF8uSbuy1Yh06ZK5PqbklIwzXbD"
     }
-    
+
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
         data = response.json()
@@ -39,46 +40,50 @@ def fetch_historical_results(limit=100):
             return data['data']['records']
     return []
 
+
 def preprocess_data(records):
     df = pd.DataFrame(records)
     df['color'] = df['simpleResultFormatList'].apply(lambda x: x[0].get('color') if x else None)
     df['color'] = df['color'].map({'green': 0, 'red': 1})
     df['issue'] = pd.to_numeric(df['issue'], errors='coerce')
     df = df.dropna(subset=['issue', 'color'])
-    
+
     # Thêm các tính năng mới
     df['previous_color'] = df['color'].shift(-1)
     df['color_change'] = (df['color'] != df['previous_color']).astype(int)
     df['issue_diff'] = df['issue'].diff().fillna(0)
 
     df = df.dropna(subset=['previous_color'])
-    
+
     return df[['issue', 'color', 'previous_color', 'color_change', 'issue_diff']]
+
 
 def train_model(df):
     X = df[['issue', 'previous_color', 'color_change', 'issue_diff']]
     y = df['color']
-    
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model = XGBClassifier(n_estimators=200, learning_rate=0.05, max_depth=5, random_state=42)
     model.fit(X_train, y_train)
-    
+
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     precision = precision_score(y_test, y_pred)
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
-    
+
     print(f"Accuracy: {accuracy:.2f}")
     print(f"Precision: {precision:.2f}")
     print(f"Recall: {recall:.2f}")
     print(f"F1 Score: {f1:.2f}")
-    
+
     return model
+
 
 def predict_next_result(model, next_issue, last_color, last_color_change, last_issue_diff):
     prediction = model.predict([[next_issue, last_color, last_color_change, last_issue_diff]])
-    return 'green' if prediction[0] == 0 else 'red'
+    return 'XANH' if prediction[0] == 0 else 'ĐỎ'
+
 
 async def start(update: Update, context: CallbackContext) -> None:
     context.user_data['last_issue'] = None
@@ -91,7 +96,15 @@ async def start(update: Update, context: CallbackContext) -> None:
     context.user_data['running'] = True
     context.user_data['result_printed'] = False  # Flag to track if the result is printed
 
-    await update.message.reply_text("Bot started! Fetching historical results...")
+    chaohoi = """────────────────────────────────────────
+=>TOOL DỰ ĐOÁN PHIÊN XANH ĐỎ COINVID VER 1.0
+=>ADMIN: HOANG HAI X HAI ANH
+────────────────────────────────────────"""
+
+    await update.message.reply_text(chaohoi)
+    time.sleep(2)
+    await update.message.reply_text("『Bot đã hoạt động, bắt đầu dự đoán phiên...』")
+
 
     while context.user_data['running']:
         try:
@@ -100,7 +113,7 @@ async def start(update: Update, context: CallbackContext) -> None:
                 df = preprocess_data(historical_results)
                 last_result = df.iloc[0]
                 issue = last_result['issue']
-                color = 'green' if last_result['color'] == 0 else 'red'
+                color = 'XANH' if last_result['color'] == 0 else 'ĐỎ'
                 color_change = last_result['color_change']
                 issue_diff = last_result['issue_diff']
 
@@ -114,7 +127,10 @@ async def start(update: Update, context: CallbackContext) -> None:
 
                     if context.user_data['last_issue'] is not None and issue != context.user_data['last_issue']:
                         next_issue = context.user_data['last_issue'] + 1
-                        next_prediction = predict_next_result(context.user_data['model'], next_issue, context.user_data['last_color'], context.user_data['last_color_change'], context.user_data['last_issue_diff'])
+                        next_prediction = predict_next_result(context.user_data['model'], next_issue,
+                                                              context.user_data['last_color'],
+                                                              context.user_data['last_color_change'],
+                                                              context.user_data['last_issue_diff'])
                         await update.message.reply_text("🥷 Dự đoán phiên tiếp theo: " + next_prediction)
 
                         if next_prediction == color:
@@ -123,7 +139,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
                         if context.user_data['predictions_count'] == 10:
                             accuracy = context.user_data['correct_predictions'] / context.user_data['predictions_count']
-                            await update.message.reply_text(f"Accuracy after 10 predictions: {accuracy:.2f}")
+                            await update.message.reply_text(f"Tổng số lệnh thắng và thua sau 10 phiên là: {accuracy:.2f}")
                             context.user_data['predictions_count'] = 0
                             context.user_data['correct_predictions'] = 0
 
@@ -143,17 +159,21 @@ async def start(update: Update, context: CallbackContext) -> None:
 
         time.sleep(5)
 
+
+
 async def stop(update: Update, context: CallbackContext) -> None:
     context.user_data['running'] = False
     await update.message.reply_text("Bot stopped!")
 
+
 def main():
-    application = Application.builder().token("7050851037:AAFOT2fxogbG383ubAIMcsA5Jfjuhk8jZVk").build()
+    application = Application.builder().token("7100769571:AAGe3JMkpL62-2ffKtM7dLenDnx6DXDNZBk").build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop))
 
     application.run_polling()
+
 
 if __name__ == "__main__":
     main()
