@@ -101,6 +101,8 @@ def train_model(df, model_type='xgboost'):
     return model
 
 def predict_next_result(model, next_issue, last_color, last_color_change, last_issue_diff):
+    if model is None:
+        raise ValueError("Model is not loaded.")
     prediction = model.predict([[next_issue, last_color, last_color_change, last_issue_diff]])
     return 'XANH' if prediction[0] == 0 else 'ĐỎ'
 
@@ -200,12 +202,18 @@ async def start(update: Update, context: CallbackContext) -> None:
                             await update.message.reply_text(result_text)
 
                         next_issue = issue + 1
-                        next_prediction = predict_next_result(
-                            context.user_data['model'], next_issue,
-                            last_result['previous_color'],
-                            color_change,
-                            issue_diff
-                        )
+                        try:
+                            next_prediction = predict_next_result(
+                                context.user_data['model'], next_issue,
+                                last_result['previous_color'],
+                                color_change,
+                                issue_diff
+                            )
+                        except ValueError as e:
+                            await update.message.reply_text(f"Lỗi dự đoán: {e}")
+                            context.user_data['running'] = False
+                            return
+
                         context.user_data['last_prediction'] = next_prediction
                         prediction_text = f"💡 Dự đoán phiên tiếp theo: {next_prediction}"
                         await update.message.reply_text(prediction_text)
