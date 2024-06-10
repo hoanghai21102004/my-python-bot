@@ -1,5 +1,7 @@
+asyncio
 requests
 pandas
+joblib
+python-telegram-bot
 xgboost
 scikit-learn
-python-telegram-bot
