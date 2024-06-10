@@ -1,4 +1,4 @@
-import time
+import asyncio
 import requests
 import pandas as pd
 import joblib
@@ -6,29 +6,36 @@ from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
 from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import random
+import string
+
+async def send_photo_from_url(update: Update, photo_url: str) -> None:
+    await update.message.reply_photo(photo=photo_url)
 
 # Tạo danh sách key
 free_key = "FREEKEY123"
-permanent_keys = ["PERMKEY" + str(i) for i in range(1, 11)]
+permanent_keys = ["PERMKEY" + ''.join(random.choices(string.ascii_letters + string.digits, k=10)) for _ in range(10)]
 
 # Lưu trữ thông tin sử dụng key
 used_keys = {}
 telegram_users = {}
 
-admin_username = "@hoanghai2110"
+admin_token = "ADM:HAGSUAJSH6SF6A777A"
 
-def fetch_historical_results(limit=100):
+def fetch_historical_results(limit=200):
     url = "https://m.coinvid.com/api/rocket-api/game/issue-result/page"
     params = {"subServiceCode": "RG1M", "size": limit}
 
-    headers = {
+ headers = {
         "Host": "m.coinvid.com",
         "Connection": "keep-alive",
         "sec-ch-ua": '"Chromium";v="124", "Android WebView";v="124", "Not-A.Brand";v="99"',
         "user_type": "rocket",
-        "Blade-Auth": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJpc3N1c2VyIiwiYXVkIjoiYXVkaWVuY2UiLCJ0ZW5hbnRfaWQiOiI2NzczNDMiLCJ1c2VyX25hbWUiOiJoYWlhbmhuZTI2IiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInJvbGVfbmFtZSI6IiIsInVzZXJfdHlwZSI6InJvY2tldCIsInVzZXJfaWQiOiIxNjI0NzQ4OTg5OTY5NDA4MDAxIiwiZGV0YWlsIjp7ImF2YXRhciI6IjIwIiwidmlwTGV2ZWwiOjJ9LCJhY2NvdW50IjoiaGFpYW5obmUyNiIsImNsaWVudF9pZCI6InJvY2tldF93ZWIiLCJleHAiOjE3MTgzNzc4MzcsIm5iZiI6MTcxNzc3MzAzN30.Vr6idkzEk3gGaAwmvhCBs4bHudP2IAgaGkasthFVH-tG3GjPKwcvW0Yr3hupTQocu1i49zv7Beq7fqQepHcAOg",
+        "Blade-Auth": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJpc3N1c2VyIiwiYXVkIjoiYXVkaWVuY2UiLCJ0ZW5hbnRfaWQiOiI2NzczNDMiLCJ1c2VyX25hbWUiOiJoYWlhbmhuZTI2IiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsInJvbGVfbmFtZSI6IiIsInVzZXJfdHlwZSI6InJvY2tldCIsInVzZXJfaWQiOiIxNjI0NzQ4OTg5OTY5NDA4MDAxIiwiZGV0YWlsIjp7ImF2YXRhciI6IjIwIiwidmlwTGV2ZWwiOjJ9LCJhY2NvdW50IjoiaGFpYW5obmUyNiIsImNsaWVudF9pZCI6InJvY2tldF93ZWIiLCJleHAiOjE3MTg2MzU1OTEsIm5iZiI6MTcxODAzMDc5MX0.dckcPAbgwZRoDJH7_HRNPqt-1LlEYg1XZecRLb6cWYkByCAYAolrqA1LQKPXKn4YI20jmhTq6K0Fl75ugefwEA",
         "Accept-Language": "en-US",
         "sec-ch-ua-mobile": "?1",
         "Authorization": "Basic cm9ja2V0X3dlYjpyb2NrZXRfd2Vi",
@@ -41,7 +48,7 @@ def fetch_historical_results(limit=100):
         "Sec-Fetch-Dest": "empty",
         "Referer": "https://m.coinvid.com/game/guessMain?gameName=RG1M&returnUrl=%2FgameList",
         "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Cookie": "_fbp=fb.1.1717773039503.427590769630604432; JSESSIONID=J_gUYvXcOABIiKF8uSbuy1Yh06ZK5PqbklIwzXbD"
+        "Cookie": "_fbp=fb.1.1717773039503.427590769630604432; JSESSIONID=VGBpK85oOB1D_a65GnuB4_V8kXvAVcbvED5Wlxkl"
     }
 
     response = requests.get(url, headers=headers, params=params)
@@ -101,8 +108,6 @@ def train_model(df, model_type='xgboost'):
     return model
 
 def predict_next_result(model, next_issue, last_color, last_color_change, last_issue_diff):
-    if model is None:
-        raise ValueError("Model is not loaded.")
     prediction = model.predict([[next_issue, last_color, last_color_change, last_issue_diff]])
     return 'XANH' if prediction[0] == 0 else 'ĐỎ'
 
@@ -121,6 +126,10 @@ def save_model(model):
 
 def check_key(key, user_id):
     global used_keys, telegram_users
+
+    # Check if the key is the admin key
+    if key == admin_token:
+        return True
 
     # Check if the key is a permanent key
     if key in permanent_keys:
@@ -171,8 +180,9 @@ async def start(update: Update, context: CallbackContext) -> None:
 ────────────────────────────────────────"""
 
     await update.message.reply_text(chaohoi)
-    time.sleep(2)
+    await send_photo_from_url(update, "https://i.ibb.co/HPwS3pB/447685774-436119322549760-4433388996537746089-n.jpg")
     await update.message.reply_text("『Bot đã hoạt động, bắt đầu dự đoán phiên...』")
+    await asyncio.sleep(2)
 
     while context.user_data['running']:
         try:
@@ -198,22 +208,16 @@ async def start(update: Update, context: CallbackContext) -> None:
                                 result_text += " | WIN ✅"
                                 context.user_data['correct_predictions'] += 1
                             else:
-                                result_text += " | LOSE ⭕"
+                                result_text += " | LOSE ❎"
                             await update.message.reply_text(result_text)
 
                         next_issue = issue + 1
-                        try:
-                            next_prediction = predict_next_result(
-                                context.user_data['model'], next_issue,
-                                last_result['previous_color'],
-                                color_change,
-                                issue_diff
-                            )
-                        except ValueError as e:
-                            await update.message.reply_text(f"Lỗi dự đoán: {e}")
-                            context.user_data['running'] = False
-                            return
-
+                        next_prediction = predict_next_result(
+                            context.user_data['model'], next_issue,
+                            last_result['previous_color'],
+                            color_change,
+                            issue_diff
+                        )
                         context.user_data['last_prediction'] = next_prediction
                         prediction_text = f"💡 Dự đoán phiên tiếp theo: {next_prediction}"
                         await update.message.reply_text(prediction_text)
@@ -239,15 +243,15 @@ async def start(update: Update, context: CallbackContext) -> None:
         except Exception as e:
             await update.message.reply_text(f"Lỗi: {e}")
 
-        time.sleep(5)
+        await asyncio.sleep(5)
 
 async def stop(update: Update, context: CallbackContext) -> None:
     context.user_data['running'] = False
     await update.message.reply_text("Bot stopped!")
 
 async def show_keys(update: Update, context: CallbackContext) -> None:
-    user = update.message.from_user.username
-    if user == admin_username:
+    token = context.args[0] if context.args else None
+    if token == admin_token:
         keys_text = "Danh sách key đã tạo:\n"
         keys_text += f"Free key: {free_key}\n"
         keys_text += "Permanent keys:\n" + "\n".join(permanent_keys)
@@ -256,7 +260,7 @@ async def show_keys(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Bạn không có quyền truy cập vào lệnh này.")
 
 def main():
-    application = Application.builder().token("7050851037:AAFOT2fxogbG383ubAIMcsA5Jfjuhk8jZVk").build()
+    application = Application.builder().token("6786036755:AAGqJHnfcMVFFyzA5BXF2Wovu4gJzdbY6VM").build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop))
@@ -266,4 +270,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
