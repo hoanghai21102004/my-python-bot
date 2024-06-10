@@ -24,7 +24,7 @@ permanent_keys = ["PERMKEY" + ''.join(random.choices(string.ascii_letters + stri
 used_keys = {}
 telegram_users = {}
 
-admin_token = "ADM:HAGSUAJSH6SF6A77A"
+admin_token = "ADM:HAGSUAJSH6SF6A777A"
 
 def fetch_historical_results(limit=200):
     url = "https://m.coinvid.com/api/rocket-api/game/issue-result/page"
@@ -260,7 +260,7 @@ async def show_keys(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Bạn không có quyền truy cập vào lệnh này.")
 
 def main():
-    application = Application.builder().token("7050851037:AAFOT2fxogbG383ubAIMcsA5Jfjuhk8jZVk").build()
+    application = Application.builder().token("6786036755:AAGqJHnfcMVFFyzA5BXF2Wovu4gJzdbY6VM").build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop))
