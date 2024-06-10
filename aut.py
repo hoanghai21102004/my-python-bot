@@ -24,7 +24,7 @@ permanent_keys = ["PERMKEY" + ''.join(random.choices(string.ascii_letters + stri
 used_keys = {}
 telegram_users = {}
 
-admin_token = "ADM:HAGSUAJSH6SF6A777A"
+admin_token = "ADM:HAGSUAJSH6SF6A77A"
 
 def fetch_historical_results(limit=200):
     url = "https://m.coinvid.com/api/rocket-api/game/issue-result/page"
