@@ -260,7 +260,7 @@ async def show_keys(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Bạn không có quyền truy cập vào lệnh này.")
 
 def main():
-    application = Application.builder().token("6786036755:AAGqJHnfcMVFFyzA5BXF2Wovu4gJzdbY6VM").build()
+    application = Application.builder().token("7050851037:AAFOT2fxogbG383ubAIMcsA5Jfjuhk8jZVk").build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop))
